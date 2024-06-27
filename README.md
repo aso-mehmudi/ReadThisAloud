@@ -15,6 +15,6 @@ Reads aloud the selected text using Microsoft Windows's default text-to-speech.
 * [QuickRead](https://www.microsoft.com/en-us/p/quickread/9wzdncrfk139)
 
 ## Source Code
-Source code is written in C# (.Net Framework 4.5) by [Aso Mahmudi](https://aso-mehmudi.github.io)
+Source code is written in C# (.Net 8) by [Aso Mahmudi](https://aso-mehmudi.github.io)
 - Icon: [Account-Voice by Google](https://materialdesignicons.com/icon/account-voice)
 - background music: [In The Moment by Steve Oxen](https://www.fesliyanstudios.com/royalty-free-music/download/in-the-moment/666)

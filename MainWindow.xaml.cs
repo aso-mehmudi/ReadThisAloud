@@ -5,22 +5,22 @@ using System.Speech.Synthesis;
 using System.Text.RegularExpressions;
 using System.IO;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace ReadThisAloud
 {
     public partial class MainWindow : Window
     {
-        SpeechSynthesizer synth = new SpeechSynthesizer();
+        SpeechSynthesizer? synth;
         System.Windows.Media.MediaPlayer player;
         Dictionary<string, string> replacements = new Dictionary<string, string>();
-
         public bool IsPlaying { get; set; }
+
         public MainWindow()
         {
             InitializeComponent();
             player = new System.Windows.Media.MediaPlayer();
             player.Volume = 0.25;
-
             if (File.Exists("replacements.txt"))
             {
                 foreach (var line in File.ReadAllLines("replacements.txt"))
@@ -39,22 +39,66 @@ namespace ReadThisAloud
                 player.Open(new Uri(Path.GetFullPath("bg.wav")));
         }
 
+        private void InitializeSynthsizer()
+        {            
+            synth = new SpeechSynthesizer();
+            synth.SpeakCompleted += Synthsizer_SpeakCompleted;
+            synth.StateChanged += Synthsizer_StateChanged;
+        }
+
         public void speak(string text)
         {
+            
+            synth?.Dispose();
             player.Play();
             player.MediaEnded += new EventHandler(Media_Ended);
-            synth.SpeakAsyncCancelAll();
             foreach (var replace in replacements)
                 text = Regex.Replace(text, replace.Key, replace.Value);
+            
+            Thread.Sleep(500); // wait a little before reading the text to avoid missing the first word on bluetooth headphones
+            InitializeSynthsizer();
             synth.SpeakAsync(text);
-            synth.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(stop);
         }
-        public void stop(object sender, SpeakCompletedEventArgs e)
+
+        private void Synthsizer_StateChanged(object? sender, StateChangedEventArgs e)
         {
-            PlayPath.Visibility = Visibility.Visible;
-            StopPath.Visibility = Visibility.Collapsed;
-            player.Stop();
+            switch (e.State)
+            {
+                case SynthesizerState.Paused:
+                    synth?.Pause();
+                    break;
+            }
         }
+
+        private void Synthsizer_SpeakCompleted(object? sender, SpeakCompletedEventArgs e)
+        {               
+            StopAll();
+        }
+
+        private void btnStop_Click(object sender, RoutedEventArgs e)
+        {
+            StopAll();
+        }
+
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            StopAll();
+        }
+
+        public void StopAll()
+        {            
+            if (synth != null)
+            {
+                synth.Dispose();
+                synth = null;
+            } 
+            player.Stop();
+            IsPlaying = false;
+            btnRun.Visibility = Visibility.Visible;
+            btnStop.Visibility = Visibility.Collapsed;
+            btnPause.Visibility = Visibility.Collapsed;
+        }
+
         private void Media_Ended(object sender, EventArgs e)
         {
             player.Position = TimeSpan.Zero;
@@ -63,31 +107,35 @@ namespace ReadThisAloud
 
         private void btnRun_Click(object sender, RoutedEventArgs e)
         {
-            if (IsPlaying)
-            {
-                synth.SpeakAsyncCancelAll();
-                PlayPath.Visibility = Visibility.Visible;
-                StopPath.Visibility = Visibility.Collapsed;
+            speak(Clipboard.GetText());
+            btnRun.Visibility = Visibility.Collapsed;
+            btnStop.Visibility = Visibility.Visible;
+            btnPause.Visibility = Visibility.Visible;
+            IsPlaying = true;
+        }
+        
+        private void btnPause_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsPlaying){
+                synth?.Pause();                
+                btnPause.Content = "▶️";
+                player.Pause();
             }
-            else
-            {
-                speak(Clipboard.GetText());
-                PlayPath.Visibility = Visibility.Collapsed;
-                StopPath.Visibility = Visibility.Visible;
+            else{
+                player.Play();
+                btnPause.Content = "⏸️";
+                Thread.Sleep(500);
+                synth?.Resume();
             }
             IsPlaying = !IsPlaying;
-        }
-
-        private void Window_Closing(object sender, CancelEventArgs e)
-        {
-            synth.SpeakAsyncCancelAll();
         }
 
         private void btnRun_Drop(object sender, DragEventArgs e)
         {
             speak(e.Data.GetData("Text") as string);
-            PlayPath.Visibility = Visibility.Collapsed;
-            StopPath.Visibility = Visibility.Visible;
+            btnRun.Visibility = Visibility.Collapsed;
+            btnStop.Visibility = Visibility.Visible;
+            btnPause.Visibility = Visibility.Visible;
             IsPlaying = true;
         }
 
